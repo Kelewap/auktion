@@ -15,12 +15,12 @@ class Buyer(auctions: List[ActorRef]) extends Actor{
 
   override def receive = {
     case BidRequest => {
-      log.debug("Buddy {} received", self.path.name)
-      var auctionToBid = auctions(Random.nextInt(auctions.length))
+      log.debug("Buddy {} received request for bid", self.path.name)
+      val auctionToBid = auctions(Random.nextInt(auctions.length))
       auctionToBid ! Bid(Random.nextInt(100))
     }
-    case Bought => {
-      println("bought cool item")
+    case Bought(itemName) => {
+      println(self.path.name + " bought cool item: " + itemName)
     }
   }
 }

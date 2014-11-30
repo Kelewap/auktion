@@ -24,12 +24,12 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration) extends Actor
 
   when(Created) {
     case Event(BidTimerExpired, _) => {
-      log.debug("expired")
+      log.debug("EXPIRED")
       goto(Ignored)
     }
 
     case Event(Bid(value), _) if value > INITIAL_BID => {
-      log.debug("received initial bid: {}", value)
+      println(self.path.name + " received valid initial bid: " + value + " from " + sender.path.name)
       goto(Activated) using AuctionData(sender, value)
     }
 
@@ -40,8 +40,8 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration) extends Actor
   }
 
   when(Activated) {
-    case Event(Bid(value), AuctionData(bestBidder, bestPrice)) if (value > bestPrice) => {
-      log.debug("received bid: {}", value)
+    case Event(Bid(value), AuctionData(bestBidder, bestPrice)) if value > bestPrice => {
+      println(self.path.name + " received valid bid: " + value + " from " + sender.path.name)
       goto(Activated) using AuctionData(sender, value)
     }
 
@@ -51,7 +51,7 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration) extends Actor
     }
 
     case Event(BidTimerExpired, AuctionData(bestBidder, bestPrice)) => {
-      bestBidder ! Bought
+      bestBidder ! Bought("item of " + self.path.name)
       context.system.scheduler.scheduleOnce(deleteTime, context.self, DeleteTimerExpired)
       goto(Sold) using AuctionData(bestBidder, bestPrice)
     }
