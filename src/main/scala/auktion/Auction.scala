@@ -12,10 +12,10 @@ case object Activated extends State
 case object Sold extends State
 
 object Auction {
-  def props(bidTime: FiniteDuration, deleteTime: FiniteDuration): Props = Props(new Auction(bidTime, deleteTime))
+  def props(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorRef): Props = Props(new Auction(bidTime, deleteTime, owner))
 }
 
-class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration) extends Actor with FSM[State, Data] {
+class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorRef) extends Actor with FSM[State, Data] {
   context.system.scheduler.scheduleOnce(bidTime, context.self, BidTimerExpired)
 
   val INITIAL_BID = 10
@@ -52,6 +52,7 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration) extends Actor
 
     case Event(BidTimerExpired, AuctionData(bestBidder, bestPrice)) => {
       bestBidder ! Bought("item of " + self.path.name)
+      owner ! AuctionEnded
       context.system.scheduler.scheduleOnce(deleteTime, context.self, DeleteTimerExpired)
       goto(Sold) using AuctionData(bestBidder, bestPrice)
     }

@@ -2,18 +2,27 @@ package auktion
 
 import java.util.concurrent.TimeUnit
 
-import akka.actor.Actor
+import akka.actor.{Props, Actor}
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class AuctionManager extends Actor {
-  val auctions = (1 to 8).map(num => context.actorOf(Auction.props(FiniteDuration(10, TimeUnit.SECONDS), FiniteDuration(10, TimeUnit.SECONDS)), "auction"+num)).toList
-  val buyers = (1 to 3).map(num => context.actorOf(Buyer.props(auctions), "buyer"+num)).toList
+  val auctionsTitles = List("380", "333", "777", "747")
+  val buyers = (1 to 3).map(num => context.actorOf(Props[Buyer], "buyer"+num)).toList
+  val theOnlySeller = context.actorOf(Seller.props(auctionsTitles))
+  val auctionRegistry = context.actorOf(Props[AuctionSearch], "auctionRegistry")
 
   def receive = {
-    case BroadcastRequests =>
+
+    case Blabla => {
+      theOnlySeller ! Publish
+    }
+
+    case BroadcastRequests => {
       buyers.map(_ ! BidRequest)
-      context.system.scheduler.scheduleOnce(FiniteDuration(2, TimeUnit.SECONDS), context.self, BroadcastRequests)
+      context.system.scheduler.scheduleOnce(FiniteDuration(4, TimeUnit.SECONDS), context.self, BroadcastRequests)
+    }
+
   }
 }

@@ -14,6 +14,7 @@ object Ble {
   def run() = {
     log.debug("Initializing auction system.")
     val manager = system.actorOf(Props[AuctionManager], "manager")
+    manager ! Blabla
     manager ! BroadcastRequests
   }
 }
