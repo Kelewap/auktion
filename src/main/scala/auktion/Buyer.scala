@@ -21,7 +21,7 @@ class Buyer(keywordOfInterest: String) extends Actor{
 
       if (auctions.length > 0) {
         val auctionToBid = auctions(Random.nextInt(auctions.length))
-        log.debug("gonna bid: {}", auctionToBid)
+        log.debug("gonna bid: {}", auctionToBid.path.name)
         auctionToBid ! Bid(Random.nextInt(100))
       }
     }

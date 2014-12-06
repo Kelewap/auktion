@@ -16,7 +16,7 @@ class AuctionSearch() extends Actor {
   override def receive: Receive = {
     case Register(title) => {
       log.debug("got register request for auction: {} from {}", title, sender)
-      val auction = context.actorOf(Auction.props(FiniteDuration(10, TimeUnit.SECONDS), FiniteDuration(10, TimeUnit.SECONDS), sender))
+      val auction = context.actorOf(Auction.props(FiniteDuration(10, TimeUnit.SECONDS), FiniteDuration(10, TimeUnit.SECONDS), sender), "auction-" + title)
       knownAuctions = knownAuctions + (title -> auction)
     }
 
