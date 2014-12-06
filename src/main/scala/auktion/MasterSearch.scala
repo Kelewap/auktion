@@ -5,12 +5,12 @@ import akka.event.LoggingReceive
 import akka.routing.{RoutingLogic, ActorRefRoutee, Router}
 
 object MasterSearch {
-  def props(poolSize: Int, registerProperties: RouterProperties, lookupProperties: RouterProperties): Props = Props(new MasterSearch(poolSize, registerProperties, lookupProperties))
+  def props(poolSize: Int, registerLogic: RoutingLogic, lookupLogic: RoutingLogic): Props = Props(new MasterSearch(poolSize, registerLogic, lookupLogic))
 
   case class Terminated(a: ActorRef)
 }
 
-class MasterSearch(poolSize: Int, registerProperties: RouterProperties, lookupProperties: RouterProperties) extends Actor{
+class MasterSearch(poolSize: Int, registerLogic: RoutingLogic, lookupLogic: RoutingLogic) extends Actor{
 
   val routees = Vector.fill(poolSize) {
     val routee = context.actorOf(Props[AuctionSearch])
@@ -18,8 +18,8 @@ class MasterSearch(poolSize: Int, registerProperties: RouterProperties, lookupPr
     ActorRefRoutee(routee)
   }
 
-  var registerRouter = Router(registerProperties.getLogic, routees.take(registerProperties.getPoolSize))
-  var lookupRouter = Router(lookupProperties.getLogic, routees.take(lookupProperties.getPoolSize))
+  var registerRouter = Router(registerLogic, routees)
+  var lookupRouter = Router(lookupLogic, routees)
 
   override def receive = LoggingReceive {
     case register: Register => {
