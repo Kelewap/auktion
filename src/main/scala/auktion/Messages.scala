@@ -21,7 +21,7 @@ case class BidTimerExpired extends AuctionMessage
 case class DeleteTimerExpired extends AuctionMessage
 case class Relist extends AuctionMessage
 
-case class Register(title: String) extends RegistryMessage
+case class Register(title: String, auction: ActorRef) extends RegistryMessage
 case class AuctionLookup(keyword: String) extends RegistryMessage
 
 case class Publish extends SellerMessage

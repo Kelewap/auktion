@@ -20,7 +20,7 @@ class Seller(auctionTitles: List[String]) extends Actor {
     case Publish => {
       log.debug("publishing")
       val registry = context.actorSelection("../auctionRegistry")
-      auctionTitles.map(title => registry ! Register(title))
+      auctionTitles.map(title => registry ! Register(title, context.actorOf(Auction.props(FiniteDuration(10, TimeUnit.SECONDS), FiniteDuration(10, TimeUnit.SECONDS), sender), "auction-" + title)))
     }
 
     case AuctionEnded => {

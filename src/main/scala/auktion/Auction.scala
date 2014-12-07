@@ -1,6 +1,8 @@
 package auktion
 
 import akka.actor.{Actor, ActorRef, FSM, Props}
+import akka.event.LoggingReceive
+import akka.persistence.PersistentActor
 
 import scala.concurrent.duration.FiniteDuration;
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -15,69 +17,101 @@ object Auction {
   def props(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorRef): Props = Props(new Auction(bidTime, deleteTime, owner))
 }
 
-class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorRef) extends Actor with FSM[State, Data] {
+class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorRef) extends PersistentActor {
   context.system.scheduler.scheduleOnce(bidTime, context.self, BidTimerExpired)
 
   val INITIAL_BID = 10
+  override def persistenceId = "persistent-auction-001"
 
-  startWith(Created, Uninitialized)
+  var data: AuctionData = AuctionData(null, INITIAL_BID)
 
-  when(Created) {
-    case Event(BidTimerExpired, _) => {
-      log.debug("EXPIRED")
-      goto(Ignored)
+  def updateState(event: StateChangeEvent): Unit = {
+    data = event.data
+    context.become(
+      event.state match {
+        case Created => created
+        case Ignored => ignored
+        case Activated => activated
+        case Sold => sold
+    })
+  }
+
+  def created: Receive = LoggingReceive {
+    case BidTimerExpired => {
+      persist(StateChangeEvent(Ignored, data)) {
+        event => {
+//          log.debug("EXPIRED")
+          updateState(event)
+        }
+      }
     }
 
-    case Event(Bid(value), _) if value > INITIAL_BID => {
-      println(self.path.name + " received valid initial bid: " + value + " from " + sender.path.name)
-      goto(Activated) using AuctionData(sender, value)
+    case Bid(value) if value > INITIAL_BID => {
+      persist(StateChangeEvent(Activated, AuctionData(sender, value))) {
+        event => {
+          println(self.path.name + " received valid initial bid: " + value + " from " + sender.path.name)
+          updateState(event)
+        }
+      }
     }
 
-    case Event(Bid(value), _) => {
-      log.debug("received ignored bid: {}", value)
-      stay()
+    case Bid(value) => {
+//      log.debug("received ignored bid: {}", value)
     }
   }
 
-  when(Activated) {
-    case Event(Bid(value), AuctionData(bestBidder, bestPrice)) if value > bestPrice => {
-      println(self.path.name + " received valid bid: " + value + " from " + sender.path.name)
-      goto(Activated) using AuctionData(sender, value)
+  def activated: Receive = LoggingReceive {
+    case BidTimerExpired => {
+      persist(StateChangeEvent(Sold, data)) {
+        event => {
+          data.bestBidder ! Bought("item of " + self.path.name)
+          owner ! AuctionEnded
+          context.system.scheduler.scheduleOnce(deleteTime, context.self, DeleteTimerExpired)
+          updateState(event)
+        }
+      }
     }
 
-    case Event(Bid(value), _) => {
-      log.debug("received ignored bid: {}", value)
-      stay()
+    case Bid(value) if value > data.bestPrice => {
+      persist(StateChangeEvent(Activated, AuctionData(sender, value))) {
+        event => {
+          println(self.path.name + " received valid bid: " + value + " from " + sender.path.name)
+          updateState(event)
+        }
+      }
     }
 
-    case Event(BidTimerExpired, AuctionData(bestBidder, bestPrice)) => {
-      bestBidder ! Bought("item of " + self.path.name)
-      owner ! AuctionEnded
-      context.system.scheduler.scheduleOnce(deleteTime, context.self, DeleteTimerExpired)
-      goto(Sold) using AuctionData(bestBidder, bestPrice)
-    }
-  }
-
-  when(Sold) {
-    case Event(DeleteTimerExpired, _) => {
-      stop
-    }
-  }
-
-
-  when(Ignored) {
-    case Event(Relist, _) => {
-      context.system.scheduler.scheduleOnce(bidTime, context.self, BidTimerExpired)
-      goto(Created) using Uninitialized
-    }
-
-    case Event(DeleteTimerExpired, _) => {
-      stop
+    case Bid(value) => {
+//      log.debug("received ignored bid: {}", value)
     }
   }
 
+  def sold: Receive = LoggingReceive {
+    case DeleteTimerExpired => {
+      context.stop(self)
+    }
+  }
+
+  def ignored: Receive = LoggingReceive {
+    case Relist => {
+      persist(StateChangeEvent(Activated, data)) {
+        event => {
+          context.system.scheduler.scheduleOnce(bidTime, context.self, BidTimerExpired)
+          updateState(event)
+        }
+      }
+    }
+  }
+
+  override def receiveRecover: Receive = {
+    case evt: StateChangeEvent => updateState(evt)
+  }
+
+  override def receiveCommand: Receive = created
 }
 
 sealed trait Data
 case object Uninitialized extends Data
 case class AuctionData(bestBidder:ActorRef, bestPrice:Int) extends Data
+
+case class StateChangeEvent(state: State, data: AuctionData)

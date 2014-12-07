@@ -14,9 +14,8 @@ class AuctionSearch() extends Actor {
   var knownAuctions : Map[String, ActorRef] = Map.empty[String, ActorRef]
 
   override def receive: Receive = {
-    case Register(title) => {
+    case Register(title, auction) => {
       log.debug("got register request for auction: {} from {}", title, sender)
-      val auction = context.actorOf(Auction.props(FiniteDuration(10, TimeUnit.SECONDS), FiniteDuration(10, TimeUnit.SECONDS), sender), "auction-" + title)
       knownAuctions = knownAuctions + (title -> auction)
     }
 

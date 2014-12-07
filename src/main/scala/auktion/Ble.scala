@@ -16,5 +16,8 @@ object Ble {
     val manager = system.actorOf(Props[AuctionManager], "manager")
     manager ! Blabla
     manager ! BroadcastRequests
+
+//    Thread.sleep(4000)
+//    system.shutdown
   }
 }
