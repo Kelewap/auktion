@@ -2,7 +2,7 @@ package auktion
 
 import akka.actor.{Actor, ActorRef, Props}
 import akka.event.LoggingReceive
-import akka.routing.{RoutingLogic, ActorRefRoutee, Router}
+import akka.routing._
 
 object MasterSearch {
   def props(poolSize: Int, registerLogic: RoutingLogic, lookupLogic: RoutingLogic): Props = Props(new MasterSearch(poolSize, registerLogic, lookupLogic))
@@ -18,8 +18,10 @@ class MasterSearch(poolSize: Int, registerLogic: RoutingLogic, lookupLogic: Rout
     ActorRefRoutee(routee)
   }
 
-  var registerRouter = Router(registerLogic, routees)
-  var lookupRouter = Router(lookupLogic, routees)
+  val resizer = DefaultResizer(lowerBound = 2, upperBound = 15)
+
+  var registerRouter = BroadcastPool( poolSize, Some(resizer) ).createRouter(context.system).withRoutees(routees)
+  var lookupRouter  = RoundRobinPool( poolSize, Some(resizer) ).createRouter(context.system).withRoutees(routees)
 
   override def receive = LoggingReceive {
     case register: Register => {
@@ -29,13 +31,7 @@ class MasterSearch(poolSize: Int, registerLogic: RoutingLogic, lookupLogic: Rout
     case loopkup: AuctionLookup => {
       lookupRouter.route(loopkup, sender())
     }
-//
-//    case MasterSearch.Terminated(terminatedRoutee) => {
-//      registerRouter = registerRouter.removeRoutee(terminatedRoutee)
-//      val newRoutee = context.actorOf(Props[AuctionSearch])
-//      context.watch(newRoutee)
-//      registerRouter = registerRouter.addRoutee(newRoutee)
-//    }
+
   }
 
 }
