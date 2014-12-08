@@ -30,7 +30,7 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorR
   var data: AuctionData = AuctionData(null, INITIAL_BID)
 
   def updateState(event: StateChangeEvent): Unit = {
-//    println(event)
+    println(event)
     data = event.data
     duration = event.duration
     context.become(
@@ -133,6 +133,7 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorR
     case evt: StateChangeEvent => updateState(evt)
 
     case RecoveryCompleted => {
+      lastTick = System.currentTimeMillis()
       val newBidTimer = FiniteDuration(bidTime.toMillis - duration, TimeUnit.MILLISECONDS)
       context.system.scheduler.scheduleOnce(newBidTimer, context.self, BidTimerExpired)
     }

@@ -16,7 +16,7 @@ class AuctionManager extends Actor {
   val REPLICATING = MasterSearch.props(POOL_SIZE, BroadcastRoutingLogic(), RoundRobinRoutingLogic())
 
   val auctionsTitles = List("380", "333", "777", "747", "777a", "777b", "777c", "777d", "777e", "767a", "767b", "767c", "767d", "767e", "767f", "767g")
-  val buyers = (1 to 30).map(num => context.actorOf(Buyer.props("7"), "buyer"+num)).toList
+  val buyers = (1 to 1).map(num => context.actorOf(Buyer.props("7"), "buyer"+num)).toList
   val theOnlySeller = context.actorOf(Seller.props(auctionsTitles))
   val auctionRegistry = context.actorOf(REPLICATING, "auctionRegistry")
 
