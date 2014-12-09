@@ -18,23 +18,22 @@ case object Activated extends State
 case object Sold extends State
 
 object Auction {
-  def props(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorRef): Props = Props(new Auction(bidTime, deleteTime, owner))
+  def props(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorRef, initialBid: Int): Props = Props(new Auction(bidTime, deleteTime, owner, initialBid))
 }
 
-class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorRef) extends PersistentActor {
+class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorRef, initialBid: Int) extends PersistentActor {
   context.system.scheduler.scheduleOnce(bidTime, context.self, BidTimerExpired)
   context.system.scheduler.scheduleOnce(100 millis, context.self, Tick)
 
-  val INITIAL_BID = 10
   override def persistenceId = "persistent-auction-001"
   var lastTick: Long = System.currentTimeMillis()
 
   var duration: Long = 0
-  var data: AuctionData = AuctionData(null, INITIAL_BID)
+  var data: AuctionData = AuctionData(null, initialBid)
 
   def updateState(event: StateChangeEvent): Unit = {
 //    context.actorSelection("../notifier") ! Notify(event)
-    println(event)
+//    println(event)
     data = event.data
     duration = event.duration
     context.become(
@@ -62,7 +61,7 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorR
       }
     }
 
-    case Bid(value) if value > INITIAL_BID => {
+    case Bid(value) if value >= initialBid => {
       persist(StateChangeEvent(Activated, AuctionData(sender, value), duration)) {
         event => {
           println(self.path.name + " received valid initial bid: " + value + " from " + sender.path.name)
@@ -70,6 +69,7 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorR
           updateTimer()
         }
       }
+      sender ! BidAccepted(value)
     }
 
     case Tickk => {
@@ -84,6 +84,7 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorR
 
     case Bid(value) => {
 //      log.debug("received ignored bid: {}", value)
+      sender ! BidDenied(value)
     }
 
     case RecoveryCompleted => {
@@ -113,10 +114,12 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorR
           updateTimer()
         }
       }
+      sender ! BidAccepted(value)
     }
 
     case Bid(value) => {
 //      log.debug("received ignored bid: {}", value)
+      sender ! BidDenied(value)
     }
 
     case Tick => {

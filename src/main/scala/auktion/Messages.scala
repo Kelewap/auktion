@@ -13,6 +13,8 @@ case class BidRequest extends BuyerMessage
 case class Bought(itemName: String) extends BuyerMessage
 case class MatchingAuctions(auctions: List[ActorRef]) extends BuyerMessage
 case class StartBidding() extends BuyerMessage
+case class BidAccepted(value: Int) extends BuyerMessage
+case class BidDenied(value: Int) extends BuyerMessage
 
 case class BroadcastRequests extends ManagementMessage
 case class Blabla extends ManagementMessage
