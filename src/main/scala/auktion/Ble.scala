@@ -17,7 +17,7 @@ object Ble {
     manager ! Blabla
     manager ! BroadcastRequests
 
-//    Thread.sleep(4000)
-//    system.shutdown
+    Thread.sleep(4000)
+    system.shutdown
   }
 }

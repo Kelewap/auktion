@@ -5,8 +5,10 @@ import java.util.concurrent.TimeUnit
 import akka.actor.{Actor, ActorRef, FSM, Props}
 import akka.event.LoggingReceive
 import akka.persistence.{RecoveryCompleted, PersistentActor}
+import spray.io.TickGenerator.Tick
 
 import scala.concurrent.duration.FiniteDuration;
+import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 sealed trait State
@@ -21,6 +23,7 @@ object Auction {
 
 class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorRef) extends PersistentActor {
   context.system.scheduler.scheduleOnce(bidTime, context.self, BidTimerExpired)
+  context.system.scheduler.scheduleOnce(100 millis, context.self, Tick)
 
   val INITIAL_BID = 10
   override def persistenceId = "persistent-auction-001"
@@ -30,6 +33,7 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorR
   var data: AuctionData = AuctionData(null, INITIAL_BID)
 
   def updateState(event: StateChangeEvent): Unit = {
+//    context.actorSelection("../notifier") ! Notify(event)
     println(event)
     data = event.data
     duration = event.duration
@@ -62,6 +66,16 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorR
       persist(StateChangeEvent(Activated, AuctionData(sender, value), duration)) {
         event => {
           println(self.path.name + " received valid initial bid: " + value + " from " + sender.path.name)
+          updateState(event)
+          updateTimer()
+        }
+      }
+    }
+
+    case Tickk => {
+      persist(StateChangeEvent(Created, data, duration)) {
+        event => {
+          context.system.scheduler.scheduleOnce(100 millis, context.self, Tick)
           updateState(event)
           updateTimer()
         }
@@ -105,6 +119,16 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorR
 //      log.debug("received ignored bid: {}", value)
     }
 
+    case Tick => {
+      persist(StateChangeEvent(Activated, data, duration)) {
+        event => {
+          context.system.scheduler.scheduleOnce(100 millis, context.self, Tick)
+          updateState(event)
+          updateTimer()
+        }
+      }
+    }
+
     case RecoveryCompleted => {
       val newBidTimer = FiniteDuration(bidTime.toMillis - duration, TimeUnit.MILLISECONDS)
       context.system.scheduler.scheduleOnce(newBidTimer, context.self, BidTimerExpired)
@@ -115,6 +139,16 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorR
     case DeleteTimerExpired => {
       context.stop(self)
     }
+
+    case Tick => {
+      persist(StateChangeEvent(Sold, data, duration)) {
+        event => {
+          context.system.scheduler.scheduleOnce(100 millis, context.self, Tick)
+          updateState(event)
+          updateTimer()
+        }
+      }
+    }
   }
 
   def ignored: Receive = LoggingReceive {
@@ -122,6 +156,16 @@ class Auction(bidTime: FiniteDuration, deleteTime: FiniteDuration, owner: ActorR
       persist(StateChangeEvent(Activated, data, duration)) {
         event => {
           context.system.scheduler.scheduleOnce(bidTime, context.self, BidTimerExpired)
+          updateState(event)
+          updateTimer()
+        }
+      }
+    }
+
+    case Tick => {
+      persist(StateChangeEvent(Ignored, data, duration)) {
+        event => {
+          context.system.scheduler.scheduleOnce(100 millis, context.self, Tick)
           updateState(event)
           updateTimer()
         }
